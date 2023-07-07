@@ -1,0 +1,16 @@
+#box{
+    background-color: red;
+    height: 20vh;
+    width: 20vh;
+    text-align: center; 
+    position: absolute;
+    box-sizing: border-box;
+    padding: 5px;
+    font-size: 2vh;
+}
+#box h1{
+    padding-top: 18%;
+}
+body{
+    margin: 0px;
+}
