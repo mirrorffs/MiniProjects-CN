@@ -1,83 +1,127 @@
-//Blogging App using Hooks
-import { useEffect,useState,useRef, useReducer } from "react";
+//Blogging App with Firebase
+import { useState, useRef, useEffect } from "react";
 
-function blogsReducer(state,action){
-    switch(action.type){
-        case 'ADD':
-            return [action.blog,...state]
+//Import fireStore reference from frebaseInit file
+import {db} from "../firebase-init";
 
-        case 'DEL':
-            return state.filter((blog,i)=>i!==action.id)
-
-        default:
-            return []
-    }
-}
+//Import all the required functions from fireStore
+import { collection, deleteDoc, doc, getDocs, onSnapshot, setDoc} from "firebase/firestore"; 
 
 export default function Blog(){
-    //Create Seprate useStateHooks
-    // const [title,setTitle]=useState('')
-    // const [content,setContent]=useState('') 
 
-    const [formData,setFormData]=useState({title:'',content:''})
-    // const [blogs,setBlogs] = useState([])
-    const [blogs, dispatch] = useReducer(blogsReducer,[])
-    const titleRef = useRef()
+    const [formData, setformData] = useState({title:"", content:""})
+    const [blogs, setBlogs] =  useState([]);
 
-    useEffect(()=>{
+    const titleRef = useRef(null);
+
+    useEffect(() => {
         titleRef.current.focus()
-    },[])
+    },[]);
 
-    useEffect(()=>{
-        if(blogs.length){
-            document.title=blogs[0].title
-        }else{
-            document.title='No Blogs'
-        }
-    },[blogs])
+    useEffect(() => {
+        
+        /*********************************************************************** */
+        /** get all the documents from the fireStore using getDocs() */ 
+        /*********************************************************************** */
+        // async function fetchData(){
+        //     const snapShot =await getDocs(collection(db, "blogs"));
+        //     console.log(snapShot);
 
-    //Passing the synthetic event as argument to stop refreshing the page on submit
-    function handleSubmit(e){
-        e.preventDefault();
-        // setBlogs([formData ,...blogs]) //useState implementation
-        dispatch({type: 'ADD',blog:formData}) //useReducer implementation
-        setFormData({
-            title:'',content:''
+        //     const blogs = snapShot.docs.map((doc) => {
+        //         return{
+        //             id: doc.id,
+        //             ...doc.data()
+        //         }
+        //     })
+        //     console.log(blogs);
+        //     setBlogs(blogs);
+
+        // }
+
+        // fetchData();
+        /*********************************************************************** */
+
+
+        /*********************************************************************** */
+        /** Get RealTime Updates from the databse using onSnapshot() */ 
+        /*********************************************************************** */
+
+        const unsub =  onSnapshot(collection(db,"blogs"), (snapShot) => {
+            const blogs = snapShot.docs.map((doc) => {
+                    return{
+                        id: doc.id,
+                        ...doc.data()
+                    }
+                })
+                console.log(blogs);
+                setBlogs(blogs);
         })
-        titleRef.current.focus()
-        console.log(blogs)
+
+        /*********************************************************************** */
+    },[]);
+
+    async function handleSubmit(e){
+        e.preventDefault();
+        titleRef.current.focus();
+
+        // Commenting setBlogs() as realtime Updates will be recieved from the database
+        //setBlogs([{title: formData.title,content:formData.content}, ...blogs]);
+
+        /*********************************************************************** */
+        /** Add a new document with an auto generated id. */ 
+        /*********************************************************************** */
+
+        const docRef = doc(collection(db, "blogs"))
+            
+        await setDoc(docRef, {
+                title: formData.title,
+                content: formData.content,
+                createdOn: new Date()
+            });
+
+        /*********************************************************************** */
+        
+        setformData({title: "", content: ""});
     }
 
-    function handleDelete(id){
-        // let newblogs=blogs.filter((blog,i)=>i!==id)
-        // setBlogs(newblogs)
-        dispatch({type: 'DEL',id})
-    }
-    
+    async function removeBlog(id){
+
+        //setBlogs( blogs.filter((blog,index)=> index !== i));
+
+        /*********************************************************************** */
+        /** Deleting a document from the Firestore */ 
+        /*********************************************************************** */
+        const docRef = doc(db,"blogs",id);
+        await deleteDoc(docRef);
+
+        /*********************************************************************** */
+     }
+
     return(
         <>
-        {/* Heading of the page */}
         <h1>Write a Blog!</h1>
-
-        {/* Division created to provide styling of section to the form */}
         <div className="section">
 
         {/* Form for to write the blog */}
             <form onSubmit={handleSubmit}>
-
-                {/* Row component to create a row for first input field */}
                 <Row label="Title">
-                        <input ref={titleRef} onChange={(e)=>setFormData({title: e.target.value, content: formData.content})} value={formData.title} className="input"
-                                placeholder="Enter the Title of the Blog here.." required/>
+                        <input className="input"
+                                placeholder="Enter the Title of the Blog here.."
+                                ref = {titleRef}
+                                value={formData.title}
+                                onChange = {(e) => setformData({title: e.target.value, content:formData.content})}
+                        />
                 </Row >
 
-                {/* Row component to create a row for Text area field */}
                 <Row label="Content">
-                        <textarea onChange={(e)=>setFormData({content: e.target.value, title: formData.title})} value={formData.content} className="input content"
-                                placeholder="Content of the Blog goes here.." required/>
+                        <textarea className="input content"
+                                placeholder="Content of the Blog goes here.."
+                                required
+                                value={formData.content}
+                                onChange = {(e) => setformData({title: formData.title,content: e.target.value})}
+                        />
                 </Row >
-
-                {/* Button to submit the blog */}            
+         
                 <button className = "btn">ADD</button>
             </form>
                      
@@ -87,13 +131,26 @@ export default function Blog(){
 
         {/* Section where submitted blogs will be displayed */}
         <h2> Blogs </h2>
-        {blogs.map((blog,i)=>(
+        {blogs.map((blog,i) => (
             <div className="blog" key={i}>
-            <h3>{blog.title}</h3>
-            <p>{blog.content}</p>
-            <button  onClick={()=>handleDelete(i)} className="btn remove">Del</button>
+                <h3>{blog.title}</h3>
+                <hr/>
+                <p>{blog.content}</p>
+
+                <div className="blog-btn">
+                        <button onClick={() => {
+                            // passing the blog id instead of index of the array to remove the document from the database
+                            removeBlog(blog.id)
+                        }}
+                        className="btn remove">
+
+                            Delete
+
+                        </button>
+                </div>
             </div>
         ))}
+        
         </>
         )
     }
